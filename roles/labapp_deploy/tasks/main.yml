@@ -1,0 +1,71 @@
+- name: Create app directory
+  file:
+    path: /root/webapp
+    state: directory
+
+- name: Create Dockerfile
+  copy:
+    dest: /root/webapp/Dockerfile
+    content: |
+      FROM php:8.3-apache
+      RUN docker-php-ext-install mysqli
+      COPY lab-app.tgz /tmp/lab-app.tgz
+      COPY php.conf /etc/apache2/sites-available/000-default.conf
+      RUN rm -f /var/www/html/index.html && \
+          tar -xzf /tmp/lab-app.tgz -C /var/www/html && \
+          chown -R www-data:www-data /var/www/html && \
+          rm -f /tmp/lab-app.tgz
+      EXPOSE 80
+      CMD ["apache2-foreground"]
+
+- name: Create Apache virtual host (php.conf)
+  copy:
+    dest: /root/webapp/php.conf
+    content: |
+      <VirtualHost *:80>
+          DocumentRoot /var/www/html
+          <Directory /var/www/html>
+              Options Indexes FollowSymLinks
+              AllowOverride All
+              Require all granted
+          </Directory>
+
+          <FilesMatch "\.php$">
+              SetHandler application/x-httpd-php
+          </FilesMatch>
+
+          DirectoryIndex index.php index.html
+          ErrorLog ${APACHE_LOG_DIR}/error.log
+          CustomLog ${APACHE_LOG_DIR}/access.log combined
+      </VirtualHost>
+
+- name: Download lab-app.tgz
+  get_url:
+    url: https://aws-tc-largeobjects.s3-us-west-2.amazonaws.com/CUR-TF-200-ACACAD/studentdownload/lab-app.tgz
+    dest: /root/webapp/lab-app.tgz
+
+- name: Render docker-compose.yml from template
+  template:
+    src: docker-compose.yml.j2
+    dest: /root/webapp/docker-compose.yml
+
+- name: Ensure Dockerfile exists before building
+  stat:
+    path: /root/webapp/Dockerfile
+  register: dockerfile_check
+
+- name: Fail if Dockerfile is missing
+  fail:
+    msg: "Dockerfile not found!"
+  when: not dockerfile_check.stat.exists
+
+- name: Build Docker image
+  command: docker build -t mylabapp:php8.3 /root/webapp
+  args:
+    chdir: /root/webapp
+
+- name: Deploy labapp stack using Docker CLI
+  command: docker stack deploy -c /root/webapp/docker-compose.yml labapp
+  args:
+    chdir: /root/webapp
+

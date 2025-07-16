@@ -1,0 +1,18 @@
+.
+├── deploy_labapp.yml
+├── inventory.ini
+└── roles
+    ├── docker_install
+    │   └── tasks
+    │       └── main.yml
+    ├── labapp_deploy
+    │   ├── tasks
+    │   │   └── main.yml
+    │   └── templates
+    │       └── docker-compose.yml.j2
+    └── swarm_setup
+        └── tasks
+            └── main.yml
+
+8 directories, 6 files
+
